@@ -1,0 +1,6 @@
+code-insight is a program that let you visualize your source code. It run
+like this:
+$ code-insight foo.c
+then code-insight will parse foo.c, it find function definition and function
+invocation and then generate a html page that describe the relationship of each
+function using javascript and html.
