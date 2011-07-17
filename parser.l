@@ -70,8 +70,8 @@ int pop_file();
 
 %%
 
-^"#"[ \t]*"define".*\n	{ /*we don't like #define*/ }
-^"#"[ \t]*"include"[ \t]*[\"]	{ BEGIN IFILE; }
+"#"[ \t]*"define".*\n	{ /*we don't like #define*/ }
+"#"[ \t]*"include"[ \t]*[\"]	{ BEGIN IFILE; }
 
 <IFILE>[^ \t\n\"]+	{
 	{
@@ -101,7 +101,7 @@ int pop_file();
 
 
 
-(static{WS}|extern{WS})?{RETURN_TYPE}	{
+(static{WS}|extern{WS})?(inline{WS})?{RETURN_TYPE}	{
 	BEGIN(LOOKING_FUNCTION_NAME);
 	function_return_type = strdup(yytext);
 }
