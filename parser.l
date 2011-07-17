@@ -1,10 +1,18 @@
 %option noyywrap yylineno nodefault
 
+%x IFILE
+%x LOOKING_RETURN_TYPE
 %x LOOKING_FUNCTION_NAME
 %x LOOKING_FUNCTION_ARGS
 %x LOOKING_FUNCTION_BODY
 %x LOOKING_ARGS_LIST
 %x LOOKING_INVOCATION_END
+
+%x LOOKING_VAR_TYPE
+%x LOOKING_IDENTIFIER
+%x LOOKING_STRUCT_BODY_START
+%x LOOKING_STRUCT_BODY_END
+%x LOOKING_TYPEDEF_END
 
 WS ([ \t\n]+)
 IDENTIFIER ([a-zA-Z_][a-zA-Z0-9_]*)
@@ -12,49 +20,116 @@ IDENTIFIER ([a-zA-Z_][a-zA-Z0-9_]*)
 INT_TYPE ((signed{WS}|unsigned{WS})?(int|long({WS}(int|long))?|short({WS}int)?|char))
 FLOAT_TYPE (float|(long{WS})?double)
 STRUCT_TYPE (struct{WS}{IDENTIFIER})
+POINTER (({WS}[*]{1,})?)
 
-RETURN_TYPE ((const{WS})?(void|{INT_TYPE}|{FLOAT_TYPE}|{STRUCT_TYPE})({WS}[*]{1,})?)
+VAR_TYPE ((void|{INT_TYPE}|{FLOAT_TYPE}|{STRUCT_TYPE}){POINTER})
+RETURN_TYPE ((const{WS})?{VAR_TYPE})
 PARS_LIST "("([^)]|\n)*")"
 
 %{
-/*
- * TODO sometimes function matches '\n', use some function to trim yytext.
- * this code can't treat typedefed variable type in right way, maybe we should read included file and build a table contains all typedefed variable type.
+/**
+ * TODO sometimes function name matches '\n', use some function to trim yytext.
+ * this code can't treat typedefed variable type in right way.
  * couldn't parse nested function invocation like foo(bar()).
  * should sizeof treated as a function?
+ * sholud match string constant? maybe there would be a string contains function definition.
  */
 #include "string.h"
+#include "hash.h"
 #include <string.h>
 int function_definition = 0;
 int function_invocation = 0;
 int comment = 0;
+int typedefed = 0;
 
 char *function_return_type = NULL;
-char *function_name = NULL;
+char *function_name = NULL;	//this will be used to temporarily store definition function name, which can be used to finish whole function definition
+char *cur_function_name = NULL;	//this svaed completely matched definition function name
 char *function_args_list = NULL;
 char *invocation_function_name = NULL;
 char *function_pars_list = NULL;
+char *type = NULL;
+char *def = NULL;
+
+struct hash_table *type_table;
+
+/*track include file*/
+struct file_stack {
+	struct file_stack *prev;
+	char *filename;
+	int lineno;
+	YY_BUFFER_STATE bs;
+	FILE *f;
+} *curbs = NULL;
+
+char *curfilename;
+
+int read_new_file(char *);
+int pop_file();
 %}
 
 %%
+
+^"#"[ \t]*"include"[ \t]*[\"]	{ BEGIN IFILE; }
+
+<IFILE>[^ \t\n\"]+	{
+	{
+		int c;
+		while (( c = input()) && c != '\n');	/*eat rest word, we don't check the finish quote, it's not our business, it's compiler's duty*/
+	}
+	if (!read_new_file(yytext)){
+		fprintf(stderr, "can't read from %s\n", yytext);
+		//yyterminate();
+	}
+	BEGIN(INITIAL);
+}
+<IFILE>.|\n	{
+	unput(*yytext);
+	fprintf(stderr, "%s:%3d bad include expression!\n", curbs->filename, yylineno);
+	BEGIN(INITIAL);
+}
+
+
+
 
 "/*"([^*]|[*]+[^/*]|\n)*"*/"	{ comment++; }
 "//".*\n	{ comment++; }
 
 (auto|break|case|continue|default|do|else|enum|for|goto|if|register|return|sizeof|switch|volatile|while)	{ /*skip some key word*/ }
 
+
+
+
+
+
 (static{WS}|extern{WS})?{RETURN_TYPE}	{
 	BEGIN(LOOKING_FUNCTION_NAME);
 	function_return_type = strdup(yytext);
 }
 
+(static|extern)	{
+	/*FIEMX this should be saved*/
+	BEGIN(LOOKING_RETURN_TYPE);/*only match typedefed type*/
+}
+
+<LOOKING_RETURN_TYPE>{WS}	{/*skip white space*/}
+<LOOKING_RETURN_TYPE>{IDENTIFIER}{POINTER} {
+	if (is_defined_type(type_table, yytext)){
+		/*FIXME should trim yytext, because it may contain '*'*/
+		BEGIN(LOOKING_FUNCTION_NAME);
+		function_return_type = strdup(yytext);
+	}
+}
+<LOOKING_RETURN_TYPE>.	{ unput(*yytext);BEGIN(INITIAL);}
+
 <LOOKING_FUNCTION_NAME>{WS}	{/*skip white space*/}
 <LOOKING_FUNCTION_NAME>{IDENTIFIER}	{
 	BEGIN(LOOKING_FUNCTION_ARGS);
-	free(function_name);	//change function name state, this means in new function body
+	free(function_name);
 	function_name = strdup(yytext);
 }
 <LOOKING_FUNCTION_NAME>. {
+	unput(*yytext);
 	BEGIN(INITIAL);
 	free(function_return_type);
 	function_return_type = NULL;
@@ -66,6 +141,7 @@ char *function_pars_list = NULL;
 	function_args_list = strdup(yytext);
 }
 <LOOKING_FUNCTION_ARGS>.	{
+	unput(*yytext);
 	BEGIN(INITIAL);
 	free(function_return_type);
 	function_return_type = NULL;
@@ -76,17 +152,20 @@ char *function_pars_list = NULL;
 <LOOKING_FUNCTION_BODY>{WS}	{/*skip white space*/}
 <LOOKING_FUNCTION_BODY>"{"	{
 	/* find "{" is to exclude some function declare, and only in function body there will be function invocation*/
-	printf("%4d definition which is '%s %s %s'\n", yylineno, function_return_type, function_name, function_args_list);
+	free(cur_function_name);
+	cur_function_name = strdup(function_name);
+	printf("%s:%3d definition which is '%s %s %s'\n", curbs->filename, yylineno, function_return_type, cur_function_name, function_args_list);
 	function_definition++;
 	free(function_return_type);
 	function_return_type = NULL;
-	//free(function_name);	//shouldn't be actived, because invocation need function_name to determin which function it belongs to
-	//function_name = NULL;
+	free(function_name);
+	function_name = NULL;
 	free(function_args_list);
 	function_args_list = NULL;
 	BEGIN(INITIAL);
 }
 <LOOKING_FUNCTION_BODY>.	{
+	unput(*yytext);
 	BEGIN(INITIAL);
 	free(function_return_type);
 	function_return_type = NULL;
@@ -96,10 +175,104 @@ char *function_pars_list = NULL;
 	function_args_list = NULL;
 }
 
-{IDENTIFIER}	{
-	BEGIN(LOOKING_ARGS_LIST);	/*this maybe function name*/
-	invocation_function_name = strdup(yytext);
+
+
+
+"typedef"	{
+	BEGIN(LOOKING_VAR_TYPE);
+	//printf("debug: find typedef in %s:%3d\n", curbs->filename, yylineno);
 }
+
+<LOOKING_VAR_TYPE>{WS}	{ /*skip white space*/ }
+<LOOKING_VAR_TYPE>(void|{INT_TYPE}|{FLOAT_TYPE}){POINTER}	{
+	BEGIN(LOOKING_IDENTIFIER);
+	type = strdup(yytext);
+	//printf("debug: find type '%s' in %s:%3d\n", type, curbs->filename, yylineno);
+}
+<LOOKING_VAR_TYPE>{STRUCT_TYPE}	{
+	BEGIN(LOOKING_STRUCT_BODY_START);
+	type = strdup(yytext);
+	//printf("debug: find type '%s' in %s:%3d\n", type, curbs->filename, yylineno);
+}
+<LOOKING_VAR_TYPE>.	{
+	unput(*yytext);
+	BEGIN(INITIAL);
+}
+
+<LOOKING_STRUCT_BODY_START>{WS}	{ /*skip white space*/}
+<LOOKING_STRUCT_BODY_START>"{"	{//          ([^}]|\n)+"}"{WS}?{IDENTIFIER}{WS}?";"	{
+	/*this handle this "typedef struct foo{int name;} bar;"*/
+	BEGIN(LOOKING_STRUCT_BODY_END);
+	/*
+	def = strdup(yytext);
+	typedefed++;
+	printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type, def);
+	insert_into_hash_table(type_table, (strchr(def, '}') + 1));	//FIXME strchr will leave space in type_name
+	printf("debug: insert '%s' into hash table\n", (strchr(def, '}') + 1));
+	BEGIN(INITIAL);
+	*/
+}
+<LOOKING_STRUCT_BODY_START>{IDENTIFIER}	{
+	/*this handle this "typedef struct foo bar;"*/
+	def = strdup(yytext);
+	BEGIN(LOOKING_TYPEDEF_END);
+	//printf("debug: find struct def '%s' in %s:%3d\n", def, curbs->filename, yylineno);
+}
+<LOOKING_STRUCT_BODY_START>.	{ BEGIN(INITIAL);free(type); }
+
+<LOOKING_STRUCT_BODY_END>"}"	{ BEGIN(LOOKING_IDENTIFIER); }
+<LOOKING_STRUCT_BODY_END>{WS}|.	{ /*do nothing*/}
+
+<LOOKING_IDENTIFIER>{WS}	{ /*skip white space*/ }
+<LOOKING_IDENTIFIER>{IDENTIFIER}	{
+	BEGIN(LOOKING_TYPEDEF_END);
+	def = strdup(yytext);
+	//printf("debug: find '%s' in %s:%3d\n", def, curbs->filename, yylineno);
+}
+<LOOKING_IDENTIFIER>.	{ BEGIN(INITIAL); free(type); }
+
+<LOOKING_TYPEDEF_END>{WS}	{ /*skip white space*/ }
+<LOOKING_TYPEDEF_END>";"	{
+	printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type, def);
+	insert_into_hash_table(type_table, def);
+	//printf("debug: insert '%s' into hash table\n", def);
+	typedefed++;
+	free(type);
+	free(def);
+	BEGIN(INITIAL);
+}
+<LOOKING_TYPEDEF_END>.	{
+	unput(*yytext);
+	BEGIN(INITIAL);
+	free(type);
+	free(def);
+}
+
+
+
+
+
+
+
+
+{IDENTIFIER}	{
+	if (is_defined_type(type_table, yytext)){
+		function_return_type = strdup(yytext);
+		BEGIN(LOOKING_FUNCTION_NAME);	/*this maybe typedefed return type*/
+	} else{
+		invocation_function_name = strdup(yytext);
+		BEGIN(LOOKING_ARGS_LIST);	/*this maybe function name*/
+	}
+}
+{IDENTIFIER}{POINTER}	{
+	/*this maybe typedefed pointer which is return type*/
+	//printf("debug: %s:%3d find '%s', which maybe is function which return typedefed type!\n", curbs->filename, yylineno, yytext);
+	function_return_type = strdup(yytext);
+	/*FIXME should trim yytext, because it may contain '*'*/
+	if (is_defined_type(type_table, yytext))
+		BEGIN(LOOKING_FUNCTION_NAME);
+}
+
 <LOOKING_ARGS_LIST>{WS}	{/*skip white space*/}
 <LOOKING_ARGS_LIST>"("	{
 	/*those code is to avoid nested parentheses*/
@@ -125,18 +298,25 @@ char *function_pars_list = NULL;
 	string_free(args_list);
 	BEGIN(LOOKING_INVOCATION_END);
 }
-<LOOKING_ARGS_LIST>.	{ BEGIN(INITIAL);free(invocation_function_name);invocation_function_name = NULL; }
+<LOOKING_ARGS_LIST>.	{
+	unput(*yytext);
+	BEGIN(INITIAL);
+	free(invocation_function_name);
+	invocation_function_name = NULL;
+}
 
 <LOOKING_INVOCATION_END>{WS}	{/*skip white space*/}
 <LOOKING_INVOCATION_END>[^{]	{
+	/*FIXME it matchs 'String string_add(int *);' ,which should be treated as function declare instead of function invocation*/
 	BEGIN(INITIAL);
 	function_invocation++;
-	printf("%4d in function '%s' which invoke '%s %s'\n", yylineno,function_name,  invocation_function_name, function_pars_list);
+	printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function_name,  invocation_function_name, function_pars_list);
 	free(invocation_function_name);
 	invocation_function_name = NULL;
 	free(function_pars_list);
 }
 <LOOKING_INVOCATION_END>.	{
+	unput(*yytext);
 	BEGIN(INITIAL);
 	free(invocation_function_name);
 	invocation_function_name = NULL;
@@ -144,11 +324,70 @@ char *function_pars_list = NULL;
 	function_pars_list = NULL;
 }
 
-.|\n {/*do nothing*/}
+
+
+
+<<EOF>>	{ if(!pop_file()) yyterminate(); }
+
+.|\n {/**
+		* maybe this will be a bug, imagine this
+		* "+int foo();" '.' while match '+' and
+		* other pattern will think other is a
+		* function invocation*/
+}
 
 %%
 
-int main(){
+int read_new_file(char *name){
+	//printf("debug: open a new file %s\n", name);
+	FILE *f = fopen(name, "r");
+	if (!f){
+		perror(name);
+		return 0;
+	}
+
+	struct file_stack *bs = (struct file_stack *)malloc(sizeof(struct file_stack));
+	if (curbs)
+		curbs->lineno = yylineno;
+	bs->prev = curbs;
+
+	bs->bs = yy_create_buffer(f, YY_BUF_SIZE);
+	bs->f = f;
+	bs->filename = name;
+	yy_switch_to_buffer(bs->bs);
+	curbs = bs;
+	yylineno = 1;
+	curfilename = name;
+	return 1;
+	//printf("debug: in the end of read_new_file function\n");
+}
+
+int pop_file(){
+	//printf("debug: in pop_file function\n");
+	struct file_stack *bs = curbs;
+	struct file_stack *prevbs;
+
+	if (curbs == NULL)	return 0;
+
+	fclose(bs->f);
+	yy_delete_buffer(bs->bs);
+	prevbs = bs->prev;
+	free(bs);
+
+	if (!prevbs) return 0;
+
+	yy_switch_to_buffer(prevbs->bs);
+	curbs = prevbs;
+	yylineno = curbs->lineno;
+	curfilename = curbs->filename;
+	//printf("debug: pop file %s\n", curbs->filename);
+	return 1;
+}
+
+
+int main(int argc, char *argv[]){
+	read_new_file(argv[1]);
+	type_table = init_hash_table();
 	yylex();
-	printf("comment %d\tfunction_definition %d\tfunction_invocation %d\n", comment, function_definition, function_invocation);
+	printf("comment %d\tfunction_definition %d\tfunction_invocation %d\ttypedefed %d\n", comment, function_definition, function_invocation, typedefed);
 }
