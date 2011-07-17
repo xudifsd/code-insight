@@ -106,7 +106,12 @@ int pop_file();
 	function_return_type = strdup(yytext);
 }
 
-(static|extern)	{
+(static{WS}|extern{WS})(inline)?	{
+	/*FIEMX this should be saved*/
+	BEGIN(LOOKING_RETURN_TYPE);/*only match typedefed type*/
+}
+
+(inline)	{
 	/*FIEMX this should be saved*/
 	BEGIN(LOOKING_RETURN_TYPE);/*only match typedefed type*/
 }
