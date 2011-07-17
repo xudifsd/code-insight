@@ -14,7 +14,7 @@
 %x LOOKING_STRUCT_BODY_END
 %x LOOKING_TYPEDEF_END
 
-WS ([ \t\n]+)
+WS (([ \t\n]+)|{COMMENT})
 IDENTIFIER ([a-zA-Z_][a-zA-Z0-9_]*)
 
 INT_TYPE ((signed{WS}|unsigned{WS})?(int|long({WS}(int|long))?|short({WS}int)?|char))
@@ -26,12 +26,12 @@ VAR_TYPE ((void|{INT_TYPE}|{FLOAT_TYPE}|{STRUCT_TYPE}){POINTER})
 RETURN_TYPE ((const{WS})?{VAR_TYPE})
 PARS_LIST "("([^)]|\n)*")"
 
+COMMENT (("/*"([^*]|[*]+[^/*]|\n)*"*/")|("//".*\n))
 %{
 /**
- * TODO sometimes function name matches '\n', use some function to trim yytext.
- * this code can't treat typedefed variable type in right way.
- * couldn't parse nested function invocation like foo(bar()).
- * should sizeof treated as a function?
+ * TODO
+ * sometimes function name matches '\n', use some function to trim yytext.
+ * couldn't parse nested function invocation like foo(bar()). Is this necessary? just to show user some function invoke foo(bar()) and bar()?
  * sholud match string constant? maybe there would be a string contains function definition.
  */
 #include "string.h"
@@ -70,6 +70,7 @@ int pop_file();
 
 %%
 
+^"#"[ \t]*"define".*\n	{ /*we don't like #define*/ }
 ^"#"[ \t]*"include"[ \t]*[\"]	{ BEGIN IFILE; }
 
 <IFILE>[^ \t\n\"]+	{
@@ -91,9 +92,7 @@ int pop_file();
 
 
 
-
-"/*"([^*]|[*]+[^/*]|\n)*"*/"	{ comment++; }
-"//".*\n	{ comment++; }
+{COMMENT}	{ comment++; }
 
 (auto|break|case|continue|default|do|else|enum|for|goto|if|register|return|sizeof|switch|volatile|while)	{ /*skip some key word*/ }
 
@@ -115,7 +114,6 @@ int pop_file();
 <LOOKING_RETURN_TYPE>{WS}	{/*skip white space*/}
 <LOOKING_RETURN_TYPE>{IDENTIFIER}{POINTER} {
 	if (is_defined_type(type_table, yytext)){
-		/*FIXME should trim yytext, because it may contain '*'*/
 		BEGIN(LOOKING_FUNCTION_NAME);
 		function_return_type = strdup(yytext);
 	}
@@ -180,19 +178,16 @@ int pop_file();
 
 "typedef"	{
 	BEGIN(LOOKING_VAR_TYPE);
-	//printf("debug: find typedef in %s:%3d\n", curbs->filename, yylineno);
 }
 
 <LOOKING_VAR_TYPE>{WS}	{ /*skip white space*/ }
 <LOOKING_VAR_TYPE>(void|{INT_TYPE}|{FLOAT_TYPE}){POINTER}	{
 	BEGIN(LOOKING_IDENTIFIER);
 	type = strdup(yytext);
-	//printf("debug: find type '%s' in %s:%3d\n", type, curbs->filename, yylineno);
 }
 <LOOKING_VAR_TYPE>{STRUCT_TYPE}	{
 	BEGIN(LOOKING_STRUCT_BODY_START);
 	type = strdup(yytext);
-	//printf("debug: find type '%s' in %s:%3d\n", type, curbs->filename, yylineno);
 }
 <LOOKING_VAR_TYPE>.	{
 	unput(*yytext);
@@ -200,23 +195,14 @@ int pop_file();
 }
 
 <LOOKING_STRUCT_BODY_START>{WS}	{ /*skip white space*/}
-<LOOKING_STRUCT_BODY_START>"{"	{//          ([^}]|\n)+"}"{WS}?{IDENTIFIER}{WS}?";"	{
-	/*this handle this "typedef struct foo{int name;} bar;"*/
+<LOOKING_STRUCT_BODY_START>"{"	{
+	/*this handle "typedef struct foo{int name;} bar;"*/
 	BEGIN(LOOKING_STRUCT_BODY_END);
-	/*
-	def = strdup(yytext);
-	typedefed++;
-	printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type, def);
-	insert_into_hash_table(type_table, (strchr(def, '}') + 1));	//FIXME strchr will leave space in type_name
-	printf("debug: insert '%s' into hash table\n", (strchr(def, '}') + 1));
-	BEGIN(INITIAL);
-	*/
 }
 <LOOKING_STRUCT_BODY_START>{IDENTIFIER}	{
-	/*this handle this "typedef struct foo bar;"*/
+	/*this handle "typedef struct foo bar;"*/
 	def = strdup(yytext);
 	BEGIN(LOOKING_TYPEDEF_END);
-	//printf("debug: find struct def '%s' in %s:%3d\n", def, curbs->filename, yylineno);
 }
 <LOOKING_STRUCT_BODY_START>.	{ BEGIN(INITIAL);free(type); }
 
@@ -227,7 +213,6 @@ int pop_file();
 <LOOKING_IDENTIFIER>{IDENTIFIER}	{
 	BEGIN(LOOKING_TYPEDEF_END);
 	def = strdup(yytext);
-	//printf("debug: find '%s' in %s:%3d\n", def, curbs->filename, yylineno);
 }
 <LOOKING_IDENTIFIER>.	{ BEGIN(INITIAL); free(type); }
 
@@ -235,7 +220,6 @@ int pop_file();
 <LOOKING_TYPEDEF_END>";"	{
 	printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type, def);
 	insert_into_hash_table(type_table, def);
-	//printf("debug: insert '%s' into hash table\n", def);
 	typedefed++;
 	free(type);
 	free(def);
@@ -266,9 +250,7 @@ int pop_file();
 }
 {IDENTIFIER}{POINTER}	{
 	/*this maybe typedefed pointer which is return type*/
-	//printf("debug: %s:%3d find '%s', which maybe is function which return typedefed type!\n", curbs->filename, yylineno, yytext);
 	function_return_type = strdup(yytext);
-	/*FIXME should trim yytext, because it may contain '*'*/
 	if (is_defined_type(type_table, yytext))
 		BEGIN(LOOKING_FUNCTION_NAME);
 }
@@ -307,7 +289,6 @@ int pop_file();
 
 <LOOKING_INVOCATION_END>{WS}	{/*skip white space*/}
 <LOOKING_INVOCATION_END>[^{]	{
-	/*FIXME it matchs 'String string_add(int *);' ,which should be treated as function declare instead of function invocation*/
 	BEGIN(INITIAL);
 	function_invocation++;
 	printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function_name,  invocation_function_name, function_pars_list);
@@ -331,15 +312,14 @@ int pop_file();
 
 .|\n {/**
 		* maybe this will be a bug, imagine this
-		* "+int foo();" '.' while match '+' and
-		* other pattern will think other is a
+		* "+int foo();" '.' will match '+' and
+		* other pattern will think rest is a
 		* function invocation*/
 }
 
 %%
 
 int read_new_file(char *name){
-	//printf("debug: open a new file %s\n", name);
 	FILE *f = fopen(name, "r");
 	if (!f){
 		perror(name);
@@ -359,11 +339,9 @@ int read_new_file(char *name){
 	yylineno = 1;
 	curfilename = name;
 	return 1;
-	//printf("debug: in the end of read_new_file function\n");
 }
 
 int pop_file(){
-	//printf("debug: in pop_file function\n");
 	struct file_stack *bs = curbs;
 	struct file_stack *prevbs;
 
@@ -380,7 +358,6 @@ int pop_file(){
 	curbs = prevbs;
 	yylineno = curbs->lineno;
 	curfilename = curbs->filename;
-	//printf("debug: pop file %s\n", curbs->filename);
 	return 1;
 }
 
