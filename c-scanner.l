@@ -252,7 +252,7 @@ char *curfilename;	/*this saved included file's name*/
 	/*those code is to avoid nested parentheses*/
 	int nested = 1;
 	char temp = 0;
-	string_replace(function_pars_list, "");
+	string_replace(function_pars_list, "(");
 	for (; (temp = input()) && temp != EOF ; string_add(function_pars_list, temp)){
 		if (temp == '('){
 			nested++;
