@@ -31,6 +31,8 @@ String * string_add(String *target, char character){	//fundamental function to a
 }
 
 String * string_append(String *target, char *src){
+	if (src == NULL)
+		return target;
 	int i;
 	for (i = 0; src[i] != '\0'; i++){
 		string_add(target, src[i]);
