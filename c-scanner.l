@@ -30,13 +30,24 @@ COMMENT (("/*"([^*]|[*]+[^/*]|\n)*"*/")|("//".*\n))
 %{
 /**
  * TODO
+ * add some builtin variable type support like size_t.
  * sometimes function name matches '\n', use some function to trim yytext.
  * couldn't parse nested function invocation like foo(bar()). Is this necessary? just to show user some function invoke foo(bar()) and bar()?
  * sholud match string constant? maybe there would be a string contains function definition.
  */
-#include "string.h"
-#include "hash.h"
 #include <string.h>
+#include "hash.h"
+#include "string.h"
+
+/*track include file*/
+struct file_stack {
+	struct file_stack *prev;
+	char *filename;
+	int lineno;
+	YY_BUFFER_STATE bs;
+	FILE *f;
+} *curbs = NULL;
+
 int function_definition = 0;
 int function_invocation = 0;
 int comment = 0;
@@ -51,21 +62,13 @@ char *function_pars_list = NULL;
 char *type = NULL;
 char *def = NULL;
 
-struct hash_table *type_table;
-
-/*track include file*/
-struct file_stack {
-	struct file_stack *prev;
-	char *filename;
-	int lineno;
-	YY_BUFFER_STATE bs;
-	FILE *f;
-} *curbs = NULL;
-
-char *curfilename;
+struct hash_table *type_table = NULL;
 
 int read_new_file(char *);
 int pop_file();
+
+char *curfilename;
+
 %}
 
 %%
@@ -366,9 +369,9 @@ int pop_file(){
 	return 1;
 }
 
-
-int main(int argc, char *argv[]){
-	read_new_file(argv[1]);
+int scan_c(char *filename){
+	curbs = NULL;	/*flex do not init the 1st area's code when it's being invoke again, so we take flex's responsibility to init them*/
+	read_new_file(filename);
 	type_table = init_hash_table();
 	yylex();
 	printf("comment %d\tfunction_definition %d\tfunction_invocation %d\ttypedefed %d\n", comment, function_definition, function_invocation, typedefed);
