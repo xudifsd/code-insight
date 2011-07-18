@@ -1,11 +1,13 @@
-#include "string.h"
 #include "entry.h"
+#include "hash.h"
+#include "string.h"
 #include <stdio.h>
 #include <malloc.h>
 
 struct file * file_entry_init(char *filename){
 	struct file * rtn = (struct file *)malloc(sizeof(struct file));
 	rtn->filename = string_init(filename);
+	rtn->type_table = init_hash_table();
 	rtn->definition_list = NULL;
 	rtn->next = NULL;
 	return rtn;
@@ -56,4 +58,14 @@ int add_function_definition(struct file * file_entry, struct function_definition
 		p->next = definition_entry;
 	}
 	return 1;
+}
+
+struct file * add_file(struct file *head, struct file *tail){
+	struct file *p = head;
+	if (p == NULL)
+		return tail;
+	for (; p->next != NULL; p = p->next);
+		/*find tail*/
+	p->next = tail;
+	return head;
 }

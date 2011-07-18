@@ -36,6 +36,7 @@ COMMENT (("/*"([^*]|[*]+[^/*]|\n)*"*/")|("//".*\n))
  * sholud match string constant? maybe there would be a string contains function definition.
  */
 #include <string.h>
+#include "entry.h"
 #include "hash.h"
 #include "string.h"
 
@@ -53,21 +54,24 @@ int function_invocation = 0;
 int comment = 0;
 int typedefed = 0;
 
-char *function_return_type = NULL;
-char *function_name = NULL;	//this will be used to temporarily store definition function name, which can be used to finish whole function definition
-char *cur_function_name = NULL;	//this svaed completely matched definition function name
-char *function_args_list = NULL;
-char *invocation_function_name = NULL;
-char *function_pars_list = NULL;
-char *type = NULL;
-char *def = NULL;
+String *function_return_type = NULL;
+String *function_name = NULL;	/*this will be used to temporarily store definition function name, which can be used to finish whole function definition*/
+String *function_args_list = NULL;
 
+struct file * init_file = NULL;
+struct function_definition *cur_function = NULL;	/*in which function's body*/
 struct hash_table *type_table = NULL;
+
+String *invocation_function_name = NULL;
+String *function_pars_list = NULL;
+
+String *type = NULL;	/*this hold "typedef foo bar"'s foo*/
+String *def = NULL;	/*this hold "typedef foo bar"'s bar*/
 
 int read_new_file(char *);
 int pop_file();
 
-char *curfilename;
+char *curfilename;	/*this saved included file's name*/
 
 %}
 
@@ -106,24 +110,26 @@ char *curfilename;
 
 (static{WS}|extern{WS})?(inline{WS})?{RETURN_TYPE}	{
 	BEGIN(LOOKING_FUNCTION_NAME);
-	function_return_type = strdup(yytext);
+	string_replace(function_return_type, yytext);
 }
 
 (static{WS}|extern{WS})(inline)?	{
 	/*FIEMX this should be saved*/
 	BEGIN(LOOKING_RETURN_TYPE);/*only match typedefed type*/
+	string_replace(function_return_type, yytext);
 }
 
 (inline)	{
 	/*FIEMX this should be saved*/
 	BEGIN(LOOKING_RETURN_TYPE);/*only match typedefed type*/
+	string_replace(function_return_type, yytext);
 }
 
-<LOOKING_RETURN_TYPE>{WS}	{/*skip white space*/}
+<LOOKING_RETURN_TYPE>{WS}	{ string_append(function_return_type, yytext); }
 <LOOKING_RETURN_TYPE>{IDENTIFIER}{POINTER} {
 	if (is_defined_type(type_table, yytext)){
 		BEGIN(LOOKING_FUNCTION_NAME);
-		function_return_type = strdup(yytext);
+		string_append(function_return_type, yytext);
 	}
 }
 <LOOKING_RETURN_TYPE>.	{ unput(*yytext);BEGIN(INITIAL);}
@@ -131,54 +137,35 @@ char *curfilename;
 <LOOKING_FUNCTION_NAME>{WS}	{/*skip white space*/}
 <LOOKING_FUNCTION_NAME>{IDENTIFIER}	{
 	BEGIN(LOOKING_FUNCTION_ARGS);
-	free(function_name);
-	function_name = strdup(yytext);
+	string_replace(function_name, yytext);
 }
 <LOOKING_FUNCTION_NAME>. {
 	unput(*yytext);
 	BEGIN(INITIAL);
-	free(function_return_type);
-	function_return_type = NULL;
 }
 
 <LOOKING_FUNCTION_ARGS>{WS}	{/*skip white space*/}
 <LOOKING_FUNCTION_ARGS>{PARS_LIST}	{
 	BEGIN(LOOKING_FUNCTION_BODY);
-	function_args_list = strdup(yytext);
+	string_replace(function_args_list, yytext);
 }
 <LOOKING_FUNCTION_ARGS>.	{
 	unput(*yytext);
 	BEGIN(INITIAL);
-	free(function_return_type);
-	function_return_type = NULL;
-	free(function_name);
-	function_name = NULL;
 }
 
 <LOOKING_FUNCTION_BODY>{WS}	{/*skip white space*/}
 <LOOKING_FUNCTION_BODY>"{"	{
 	/* find "{" is to exclude some function declare, and only in function body there will be function invocation*/
-	free(cur_function_name);
-	cur_function_name = strdup(function_name);
-	printf("%s:%3d definition which is '%s %s %s'\n", curbs->filename, yylineno, function_return_type, cur_function_name, function_args_list);
+	cur_function = definition_entry_init(yylineno, curfilename, function_return_type->buffer, function_name->buffer, function_args_list->buffer);
+	add_function_definition(init_file, cur_function);
+	printf("%s:%3d definition which is '%s %s %s'\n", curbs->filename, yylineno, function_return_type->buffer, cur_function->function_name->buffer, function_args_list->buffer);
 	function_definition++;
-	free(function_return_type);
-	function_return_type = NULL;
-	free(function_name);
-	function_name = NULL;
-	free(function_args_list);
-	function_args_list = NULL;
 	BEGIN(INITIAL);
 }
 <LOOKING_FUNCTION_BODY>.	{
 	unput(*yytext);
 	BEGIN(INITIAL);
-	free(function_return_type);
-	function_return_type = NULL;
-	free(function_name);
-	function_name = NULL;
-	free(function_args_list);
-	function_args_list = NULL;
 }
 
 
@@ -191,11 +178,11 @@ char *curfilename;
 <LOOKING_VAR_TYPE>{WS}	{ /*skip white space*/ }
 <LOOKING_VAR_TYPE>(void|{INT_TYPE}|{FLOAT_TYPE}){POINTER}	{
 	BEGIN(LOOKING_IDENTIFIER);
-	type = strdup(yytext);
+	string_replace(type, yytext);
 }
 <LOOKING_VAR_TYPE>{STRUCT_TYPE}	{
 	BEGIN(LOOKING_STRUCT_BODY_START);
-	type = strdup(yytext);
+	string_replace(type, yytext);
 }
 <LOOKING_VAR_TYPE>.	{
 	unput(*yytext);
@@ -209,10 +196,10 @@ char *curfilename;
 }
 <LOOKING_STRUCT_BODY_START>{IDENTIFIER}	{
 	/*this handle "typedef struct foo bar;"*/
-	def = strdup(yytext);
+	string_replace(def, yytext);
 	BEGIN(LOOKING_TYPEDEF_END);
 }
-<LOOKING_STRUCT_BODY_START>.	{ BEGIN(INITIAL);free(type); }
+<LOOKING_STRUCT_BODY_START>.	{ BEGIN(INITIAL); }
 
 <LOOKING_STRUCT_BODY_END>"}"	{ BEGIN(LOOKING_IDENTIFIER); }
 <LOOKING_STRUCT_BODY_END>{WS}|.	{ /*do nothing*/}
@@ -220,24 +207,20 @@ char *curfilename;
 <LOOKING_IDENTIFIER>{WS}	{ /*skip white space*/ }
 <LOOKING_IDENTIFIER>{IDENTIFIER}	{
 	BEGIN(LOOKING_TYPEDEF_END);
-	def = strdup(yytext);
+	string_replace(def, yytext);
 }
-<LOOKING_IDENTIFIER>.	{ BEGIN(INITIAL); free(type); }
+<LOOKING_IDENTIFIER>.	{ BEGIN(INITIAL); }
 
 <LOOKING_TYPEDEF_END>{WS}	{ /*skip white space*/ }
 <LOOKING_TYPEDEF_END>";"	{
-	printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type, def);
-	insert_into_hash_table(type_table, def);
+	printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type->buffer, def->buffer);
+	insert_into_hash_table(type_table, def->buffer);
 	typedefed++;
-	free(type);
-	free(def);
 	BEGIN(INITIAL);
 }
 <LOOKING_TYPEDEF_END>.	{
 	unput(*yytext);
 	BEGIN(INITIAL);
-	free(type);
-	free(def);
 }
 
 
@@ -249,18 +232,19 @@ char *curfilename;
 
 {IDENTIFIER}	{
 	if (is_defined_type(type_table, yytext)){
-		function_return_type = strdup(yytext);
+		string_replace(function_return_type, yytext);
 		BEGIN(LOOKING_FUNCTION_NAME);	/*this maybe typedefed return type*/
 	} else{
-		invocation_function_name = strdup(yytext);
+		string_replace(invocation_function_name, yytext);
 		BEGIN(LOOKING_ARGS_LIST);	/*this maybe function name*/
 	}
 }
 {IDENTIFIER}{POINTER}	{
 	/*this maybe typedefed pointer which is return type*/
-	function_return_type = strdup(yytext);
-	if (is_defined_type(type_table, yytext))
+	if (is_defined_type(type_table, yytext)){
 		BEGIN(LOOKING_FUNCTION_NAME);
+		string_replace(function_return_type, yytext);
+	}
 }
 
 <LOOKING_ARGS_LIST>{WS}	{/*skip white space*/}
@@ -268,15 +252,15 @@ char *curfilename;
 	/*those code is to avoid nested parentheses*/
 	int nested = 1;
 	char temp = 0;
-	String *args_list = string_init(yytext);
-	for (; (temp = input()) && temp != EOF ; string_add(args_list, temp)){
+	string_replace(function_pars_list, "");
+	for (; (temp = input()) && temp != EOF ; string_add(function_pars_list, temp)){
 		if (temp == '('){
 			nested++;
 		} else if ( temp == ')'){
 			nested--;
 		}
 		if (nested == 0){
-			string_add(args_list, temp);
+			string_add(function_pars_list, temp);
 			break;
 		}
 	}
@@ -284,33 +268,31 @@ char *curfilename;
 		fprintf(stderr, "fatal error in source code, unfinished\n");
 		exit(1);
 	}
-	function_pars_list = strdup(args_list->buffer);
-	string_free(args_list);
 	BEGIN(LOOKING_INVOCATION_END);
 }
 <LOOKING_ARGS_LIST>.	{
 	unput(*yytext);
 	BEGIN(INITIAL);
-	free(invocation_function_name);
-	invocation_function_name = NULL;
 }
 
 <LOOKING_INVOCATION_END>{WS}	{/*skip white space*/}
 <LOOKING_INVOCATION_END>[^{]	{
 	BEGIN(INITIAL);
 	function_invocation++;
-	printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function_name,  invocation_function_name, function_pars_list);
-	free(invocation_function_name);
-	invocation_function_name = NULL;
-	free(function_pars_list);
+	if (cur_function == NULL){
+		/*
+		 * this means invoke function out of function definition,
+		 * maybe this because our regex is not mature,solve this later.
+		 * */
+		printf("%s:%3d out of function definition invoke '%s %s'\n", curbs->filename, yylineno,  invocation_function_name->buffer, function_pars_list->buffer);
+	} else{
+		add_invoked_function(cur_function, invocation_entry_init(yylineno, invocation_function_name->buffer, function_pars_list->buffer));
+		printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function->function_name->buffer,  invocation_function_name->buffer, function_pars_list->buffer);
+	}
 }
 <LOOKING_INVOCATION_END>.	{
 	unput(*yytext);
 	BEGIN(INITIAL);
-	free(invocation_function_name);
-	invocation_function_name = NULL;
-	free(function_pars_list);
-	function_pars_list = NULL;
 }
 
 
@@ -369,10 +351,52 @@ int pop_file(){
 	return 1;
 }
 
-int scan_c(char *filename){
-	curbs = NULL;	/*flex do not init the 1st area's code when it's being invoke again, so we take flex's responsibility to init them*/
+void init(){
+	/**
+	 * Because flex do not execute 1st area's code when it's being invoked
+	 * again, so we take flex's responsibility to init them everytimes.*/
+	if (curbs != NULL){
+		curbs = NULL;
+
+		function_definition = 0;
+		function_invocation = 0;
+		comment = 0;
+		typedefed = 0;
+
+		string_replace(function_return_type, "");
+		string_replace(function_name, "");
+		string_replace(function_args_list, "");
+
+		init_file = NULL;
+		cur_function = NULL;
+		type_table = NULL;
+
+		string_replace(invocation_function_name, "");
+		string_replace(function_pars_list, "");
+
+		string_replace(type, "");
+		string_replace(def, "");
+
+		curfilename = NULL;
+	} else {
+		function_return_type = string_init("");
+		function_name = string_init("");
+		function_args_list = string_init("");
+
+		invocation_function_name = string_init("");
+		function_pars_list = string_init("");
+
+		type = string_init("");
+		def = string_init("");
+	}
+
+}
+struct file *scan_c(char *filename){
+	init();
+	init_file = file_entry_init(filename);
+	type_table = init_file->type_table;
 	read_new_file(filename);
-	type_table = init_hash_table();
 	yylex();
 	printf("comment %d\tfunction_definition %d\tfunction_invocation %d\ttypedefed %d\n", comment, function_definition, function_invocation, typedefed);
+	return init_file;
 }

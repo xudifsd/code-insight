@@ -1,10 +1,12 @@
 #ifndef PARSE_H
 #define PARSE_H
 
+#include "hash.h"
 #include "string.h"
 
 struct file {
 	String *filename;
+	struct hash_table *type_table;	/*save all typedef variable type*/
 	struct function_definition *definition_list;
 	struct file *next;
 };
@@ -30,4 +32,5 @@ extern struct file * file_entry_init(char *);
 extern struct function_definition * definition_entry_init(int, char *, char *, char *, char *);
 extern struct invoked_function * invocation_entry_init(int, char *, char *);
 extern int add_invoked_function(struct function_definition *, struct invoked_function *);
+extern int add_function_definition(struct file *, struct function_definition *);
 #endif /*PARSE_H*/
