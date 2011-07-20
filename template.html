@@ -6,7 +6,23 @@
 	<title>code-insight</title>
 	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
 	<script type="text/javascript">
-		var database = %s;//this is for fprintf in c
+		var code_insight = {};
+		code_insight.database = %s;//this is for fprintf in c
+		code_insight.definition_block = function(object){
+			var rtn = $('<div id="definition"></div>').attr("function_name", object["function_name"]);
+			rtn.append($('<div id="lineno">' + object["lineno"] + '</div>'));
+			rtn.append($('<div id="return_value">' + object["return_value"] + '</div>'));
+			rtn.append($('<div id="function_name">' + object["function_name"] + '</div>'));
+			rtn.append($('<div id="args_list">' + object["args_list"] + '</div>'));
+			return rtn;
+		};
+		$(document).ready(function(){
+			for(var i = 0; i < code_insight.database.length; i++){
+				for (var j = 0; j < code_insight.database[i]["definition_list"].length; j++){
+					$('body').append(code_insight.definition_block(code_insight.database[i]["definition_list"][j]));
+				}
+			}
+		});
 	</script>
 </head>
 <body>
