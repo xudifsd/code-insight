@@ -50,7 +50,7 @@ cJSON * interpret_file(struct file * file){
 	}
 }
 
-char * generate(struct file *start){
+char * interpret(struct file *start){
 	cJSON *rtn = cJSON_CreateArray();
 	struct file *p = start;
 	while(p != NULL){
