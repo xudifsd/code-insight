@@ -59,7 +59,7 @@ String *function_name = NULL;	/*this will be used to temporarily store definitio
 String *function_args_list = NULL;
 
 struct file * init_file = NULL;
-struct function_definition *cur_function = NULL;	/*in which function's body*/
+struct definition *cur_function = NULL;	/*in which function's body*/
 struct hash_table *type_table = NULL;
 
 String *invocation_function_name = NULL;
@@ -158,7 +158,7 @@ char *curfilename;	/*this saved included file's name*/
 <LOOKING_FUNCTION_BODY>"{"	{
 	/* find "{" is to exclude some function declare, and only in function body there will be function invocation*/
 	cur_function = definition_entry_init(yylineno, curfilename, function_return_type->buffer, function_name->buffer, function_args_list->buffer);
-	add_function_definition(init_file, cur_function);
+	add_definition(init_file, cur_function);
 	printf("%s:%3d definition which is '%s %s %s'\n", curbs->filename, yylineno, function_return_type->buffer, cur_function->function_name->buffer, function_args_list->buffer);
 	function_definition++;
 	BEGIN(INITIAL);
@@ -286,7 +286,7 @@ char *curfilename;	/*this saved included file's name*/
 		 * */
 		printf("%s:%3d out of function definition invoke '%s %s'\n", curbs->filename, yylineno,  invocation_function_name->buffer, function_pars_list->buffer);
 	} else{
-		add_invoked_function(cur_function, invocation_entry_init(yylineno, invocation_function_name->buffer, function_pars_list->buffer));
+		add_invocation(cur_function, invocation_entry_init(yylineno, invocation_function_name->buffer, function_pars_list->buffer));
 		printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function->function_name->buffer,  invocation_function_name->buffer, function_pars_list->buffer);
 	}
 }

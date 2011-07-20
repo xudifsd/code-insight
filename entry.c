@@ -13,8 +13,8 @@ struct file * file_entry_init(char *filename){
 	return rtn;
 }
 
-struct function_definition * definition_entry_init(int lineno, char *filename, char *return_value, char *function_name, char *args_list){
-	struct function_definition *rtn = (struct function_definition *) malloc(sizeof(struct function_definition));
+struct definition * definition_entry_init(int lineno, char *filename, char *return_value, char *function_name, char *args_list){
+	struct definition *rtn = (struct definition *) malloc(sizeof(struct definition));
 	rtn->lineno = lineno;
 	rtn->file_name = string_init(filename);
 	rtn->return_value = string_init(return_value);
@@ -25,8 +25,8 @@ struct function_definition * definition_entry_init(int lineno, char *filename, c
 	return rtn;
 }
 
-struct invoked_function * invocation_entry_init(int lineno, char *function_name, char *pars_list){
-	struct invoked_function *rtn = (struct invoked_function *)malloc(sizeof(struct invoked_function));
+struct invocation * invocation_entry_init(int lineno, char *function_name, char *pars_list){
+	struct invocation *rtn = (struct invocation *)malloc(sizeof(struct invocation));
 	rtn->lineno = lineno;
 	rtn->function_name = string_init(function_name);
 	rtn->pars_list = string_init(pars_list);
@@ -34,9 +34,9 @@ struct invoked_function * invocation_entry_init(int lineno, char *function_name,
 	return rtn;
 }
 
-int add_invoked_function(struct function_definition *definition, struct invoked_function *invocation){
+int add_invocation(struct definition *definition, struct invocation *invocation){
 	/*FIXME should add error check*/
-	struct invoked_function *p = definition->invocation_list;
+	struct invocation *p = definition->invocation_list;
 	if (p == NULL){
 		definition->invocation_list = invocation;
 	} else{
@@ -47,9 +47,9 @@ int add_invoked_function(struct function_definition *definition, struct invoked_
 	return 1;
 }
 
-int add_function_definition(struct file * file_entry, struct function_definition *definition_entry){
+int add_definition(struct file * file_entry, struct definition *definition_entry){
 	/*FIXME should add error check*/
-	struct function_definition *p = file_entry->definition_list;
+	struct definition *p = file_entry->definition_list;
 	if (p == NULL){
 		file_entry->definition_list = definition_entry;
 	} else {
