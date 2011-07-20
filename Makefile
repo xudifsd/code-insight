@@ -1,6 +1,6 @@
 
-OBJS = cJSON.o c-scanner.o entry.o interpreter.o hash.o main.o string.o
-LIBS = cJSON.h hash.h entry.h interpreter.h string.h
+OBJS = cJSON.o c-scanner.o entry.o generator.o interpreter.o hash.o main.o string.o
+LIBS = cJSON.h hash.h entry.h generator.h interpreter.h string.h
 PROS = code-insight
 
 CFLAGES = -g
@@ -19,6 +19,9 @@ c-scanner.c: $(LIBS) c-scanner.l
 
 entry.o : $(LIBS) entry.c
 	gcc $(CFLAGES) -c entry.c
+
+generator.o : $(LIBS) generator.c
+	gcc $(CFLAGES) -c generator.c
 
 interpreter.o : $(LIBS) interpreter.c
 	gcc $(CFLAGES) -c interpreter.c
