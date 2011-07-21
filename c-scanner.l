@@ -159,7 +159,7 @@ char *curfilename;	/*this saved included file's name*/
 	/* find "{" is to exclude some function declare, and only in function body there will be function invocation*/
 	cur_function = definition_entry_init(yylineno, curfilename, function_return_type->buffer, function_name->buffer, function_args_list->buffer);
 	add_definition(init_file, cur_function);
-	printf("%s:%3d definition which is '%s %s %s'\n", curbs->filename, yylineno, function_return_type->buffer, cur_function->function_name->buffer, function_args_list->buffer);
+	//printf("%s:%3d definition which is '%s %s %s'\n", curbs->filename, yylineno, function_return_type->buffer, cur_function->function_name->buffer, function_args_list->buffer);
 	function_definition++;
 	BEGIN(INITIAL);
 }
@@ -213,7 +213,7 @@ char *curfilename;	/*this saved included file's name*/
 
 <LOOKING_TYPEDEF_END>{WS}	{ /*skip white space*/ }
 <LOOKING_TYPEDEF_END>";"	{
-	printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type->buffer, def->buffer);
+	//printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type->buffer, def->buffer);
 	insert_into_hash_table(type_table, def->buffer);
 	typedefed++;
 	BEGIN(INITIAL);
@@ -284,10 +284,10 @@ char *curfilename;	/*this saved included file's name*/
 		 * this means invoke function out of function definition,
 		 * maybe this because our regex is not mature,solve this later.
 		 * */
-		printf("%s:%3d out of function definition invoke '%s %s'\n", curbs->filename, yylineno,  invocation_function_name->buffer, function_pars_list->buffer);
+		//printf("%s:%3d out of function definition invoke '%s %s'\n", curbs->filename, yylineno,  invocation_function_name->buffer, function_pars_list->buffer);
 	} else{
 		add_invocation(cur_function, invocation_entry_init(yylineno, invocation_function_name->buffer, function_pars_list->buffer));
-		printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function->function_name->buffer,  invocation_function_name->buffer, function_pars_list->buffer);
+		//printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function->function_name->buffer,  invocation_function_name->buffer, function_pars_list->buffer);
 	}
 }
 <LOOKING_INVOCATION_END>.	{
@@ -397,6 +397,6 @@ struct file *scan_c(char *filename){
 	type_table = init_file->type_table;
 	read_new_file(filename);
 	yylex();
-	printf("comment %d\tfunction_definition %d\tfunction_invocation %d\ttypedefed %d\n", comment, function_definition, function_invocation, typedefed);
+	//printf("comment %d\tfunction_definition %d\tfunction_invocation %d\ttypedefed %d\n", comment, function_definition, function_invocation, typedefed);
 	return init_file;
 }
