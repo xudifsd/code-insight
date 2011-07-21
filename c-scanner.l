@@ -85,9 +85,25 @@ char *curfilename;	/*this saved included file's name*/
 		int c;
 		while (( c = input()) && c != '\n');	/*eat rest word, we don't check the finish quote, it's not our business, it's compiler's duty*/
 	}
-	if (!read_new_file(yytext)){
+	int rtn;
+	if (*yytext == '/'){	/*abs path*/
+		rtn = read_new_file(yytext);
+	}else {
+		char *a = curfilename;
+		char *prefix = malloc(256);
+		memset(prefix, 0, 256);
+		while ((a = strchr(a, '/')) != NULL){
+			memcpy(prefix, curfilename, a - curfilename);
+			a++;
+		}
+		strcat(prefix, "/");
+		strcat(prefix, yytext);
+		rtn = read_new_file(prefix);
+		//printf("debug:prefix is '%s'\n", prefix);
+	}
+	if (!rtn){
 		fprintf(stderr, "can't read from %s\n", yytext);
-		//yyterminate();
+		fprintf(stderr, "%s:%d include file '%s'\n", curfilename, yylineno, yytext);
 	}
 	BEGIN(INITIAL);
 }
@@ -265,8 +281,8 @@ char *curfilename;	/*this saved included file's name*/
 		}
 	}
 	if (temp == EOF){
-		fprintf(stderr, "fatal error in source code, unfinished\n");
-		exit(1);
+		fprintf(stderr, "%s:%d fatal error in source code, reading function_pars_list '%s'\n", curfilename, yylineno, function_pars_list->buffer);
+		//exit(1);
 	}
 	BEGIN(LOOKING_INVOCATION_END);
 }

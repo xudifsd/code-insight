@@ -1,5 +1,6 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include "entry.h"
-#include "hash.h"
 #include "interpreter.h"
 #include "generator.h"
 
@@ -10,6 +11,14 @@ int main(int argc, char *argv[]){
 		head = add_file(head, scan_c(argv[i]));	/*only handle C language right now*/
 	}
 	FILE * template = fopen("template.html", "r");
+	if (template == NULL){
+		perror("reading template:");
+		exit(1);
+	}
 	FILE * out = fopen("code-insight.html", "w");
+	if (out== NULL){
+		perror("reading output file:");
+		exit(1);
+	}
 	fprintf(out, read_template(template), interpret(head));
 }

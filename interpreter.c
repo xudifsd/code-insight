@@ -4,9 +4,9 @@
 #include "entry.h"
 
 /**
- * usage of cJSON please read cJSON-README.
+ * usage of cJSON is in cJSON-README.
  * this file is used to translate struct in c into JSON in js,
- * so that we can using the data we collected from source code
+ * so that we can use the data we collected from source code
  * to display in html
  * */
 
