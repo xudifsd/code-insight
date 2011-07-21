@@ -3,10 +3,19 @@
 #include "cJSON.h"
 #include "entry.h"
 
-cJSON * interpret_invocation(struct invocation *invocation){
+/**
+ * usage of cJSON please read cJSON-README.
+ * this file is used to translate struct in c into JSON in js,
+ * so that we can using the data we collected from source code
+ * to display in html
+ * */
+
+cJSON * interpret_invocation(struct invocation *invocation, char *definition_name){
+	/*definition_name is the name of function which invoke invocation*/
 	cJSON * rtn = cJSON_CreateObject();
 	cJSON_AddNumberToObject(rtn, "lineno", invocation->lineno);
 	cJSON_AddStringToObject(rtn, "function_name", invocation->function_name->buffer);
+	cJSON_AddStringToObject(rtn, "definition_name", definition_name);
 	cJSON_AddStringToObject(rtn, "pars_list", invocation->pars_list->buffer);
 	return rtn;
 }
@@ -25,7 +34,7 @@ cJSON * interpret_definition(struct definition *definition){
 		return rtn;
 	} else {
 		while (p != NULL){
-			cJSON_AddItemToArray(invocation_list, interpret_invocation(p));
+			cJSON_AddItemToArray(invocation_list, interpret_invocation(p, definition->function_name->buffer));
 			p = p->next;
 		}
 		return rtn;
