@@ -7,24 +7,54 @@
 	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
 	<script type="text/javascript">
 		var code_insight = {};
-		code_insight.database = %s;//this is for fprintf in c
-		code_insight.definition_block = function(object){
-			var rtn = $('<div id="definition"></div>').attr("function_name", object["function_name"]);
-			rtn.append($('<div id="lineno">' + object["lineno"] + '</div>'));
-			rtn.append($('<div id="return_value">' + object["return_value"] + '</div>'));
-			rtn.append($('<div id="function_name">' + object["function_name"] + '</div>'));
-			rtn.append($('<div id="args_list">' + object["args_list"] + '</div>'));
+		code_insight.database = %s;/*this is for fprintf in c*/
+		code_insight.createFileBlock = function(object){
+			var rtn = $('<div id="file"></div>').append($('<span/>').attr("file_name", object["file_name"]).text(object["file_name"]));
+			return rtn;
+		};
+		code_insight.createDefinitionBlock = function(object){	/*generate definition's div block*/
+			var rtn = $('<div id="definition"/>').attr("function_name", object["function_name"]);
+			rtn.append($('<span id="lineno"/>').text(object["lineno"]));
+			rtn.append($('<span id="return_value"/>').text(object["return_value"]));
+			rtn.append($('<span id="function_name"/>').text(object["function_name"]));
+			rtn.append($('<span id="args_list"/>').text(object["args_list"]));
+			return rtn;
+		};
+		code_insight.findDefinition = function(functionName){
+			var rtn = [];
+			for (var i = 0; i < code_insight.database.length; i++){
+				for(var j = 0; j < code_insight.database[i]['definition_list'].length; j++){
+					if (functionName === code_insight.database[i]['definition_list'][j]['function_name'])
+						rtn.push(code_insight.database[i]['definition_list'][j]);
+				}
+			}
 			return rtn;
 		};
 		$(document).ready(function(){
-			for(var i = 0; i < code_insight.database.length; i++){
-				for (var j = 0; j < code_insight.database[i]["definition_list"].length; j++){
-					$('body').append(code_insight.definition_block(code_insight.database[i]["definition_list"][j]));
-				}
+			$('div#loading').hide();
+			for(var i = 0; i < code_insight.database.length; i++){	/*display all file at the beginning*/
+				$('div#content').append(code_insight.createFileBlock(code_insight.database[i]));
 			}
+			$('button#searchButton').click(function(){
+				$('div#content').empty();
+				$('div#loading').show();
+				var definitionObjects = code_insight.findDefinition($('input#searchTerm').val());
+				if (definitionObjects.length === 0){
+					$('div#content').append($('<div id="sorry"/>').html('<span style="font-color:red;">No function named "'+ $('input#searchTerm').val() +'" found</span>'));
+				} else {
+					for (var i = 0; i < definitionObjects.length; i++){
+						$('div#content').append(code_insight.createDefinitionBlock(definitionObjects[i]));
+					}
+				}
+				$('div#loading').hide();
+			});
 		});
 	</script>
 </head>
 <body>
+<div id="topbar"><input id="searchTerm" style="width:200px;height:15px;"></input><button id="searchButton">search function</button></div>
+<hr/>
+<div id="content"></div>
+<div id="loading"><span style="font-size:30px;">Loading ...</span></div>
 </body>
 </html>
