@@ -10,12 +10,16 @@
  * to display in html
  * */
 
-cJSON * interpret_invocation(struct invocation *invocation, char *definition_name){
-	/*definition_name is the name of function which invoke invocation*/
+cJSON * interpret_invocation(struct invocation *invocation,char *file_name, char *definition_name){
+	/**
+	 * definition_name is the name of function which invoke invocation,
+	 * file_name is the name of file in which function being invoked.
+	 * */
 	cJSON * rtn = cJSON_CreateObject();
 	cJSON_AddNumberToObject(rtn, "lineno", invocation->lineno);
-	cJSON_AddStringToObject(rtn, "function_name", invocation->function_name->buffer);
+	cJSON_AddStringToObject(rtn, "file_name", file_name);
 	cJSON_AddStringToObject(rtn, "definition_name", definition_name);
+	cJSON_AddStringToObject(rtn, "function_name", invocation->function_name->buffer);
 	cJSON_AddStringToObject(rtn, "pars_list", invocation->pars_list->buffer);
 	return rtn;
 }
@@ -34,7 +38,7 @@ cJSON * interpret_definition(struct definition *definition){
 		return rtn;
 	} else {
 		while (p != NULL){
-			cJSON_AddItemToArray(invocation_list, interpret_invocation(p, definition->function_name->buffer));
+			cJSON_AddItemToArray(invocation_list, interpret_invocation(p, definition->file_name->buffer, definition->function_name->buffer));
 			p = p->next;
 		}
 		return rtn;
