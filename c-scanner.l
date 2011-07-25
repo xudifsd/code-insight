@@ -77,8 +77,9 @@ char *curfilename;	/*this saved included file's name*/
 
 %%
 
-"#"[ \t]*"define".*\n	{ /*we don't like #define*/ }
+"#"[ \t]*("define"|"ifndef"|"ifdef"|"endif").*\n	{ /*we don't like macro*/ }
 "#"[ \t]*"include"[ \t]*[\"]	{ BEGIN IFILE; }
+["]([^"]|("\\\""))["]	{ /*skip string*/ }
 
 <IFILE>[^ \t\n\"]+	{
 	{
@@ -96,10 +97,10 @@ char *curfilename;	/*this saved included file's name*/
 			memcpy(prefix, curfilename, a - curfilename);
 			a++;
 		}
-		strcat(prefix, "/");
+		if (strcmp(prefix, ""))
+			strcat(prefix, "/");
 		strcat(prefix, yytext);
 		rtn = read_new_file(prefix);
-		//printf("debug:prefix is '%s'\n", prefix);
 	}
 	if (!rtn){
 		fprintf(stderr, "can't read from %s\n", yytext);
@@ -175,7 +176,6 @@ char *curfilename;	/*this saved included file's name*/
 	/* find "{" is to exclude some function declare, and only in function body there will be function invocation*/
 	cur_function = definition_entry_init(yylineno, curfilename, function_return_type->buffer, function_name->buffer, function_args_list->buffer);
 	add_definition(init_file, cur_function);
-	//printf("%s:%3d definition which is '%s %s %s'\n", curbs->filename, yylineno, function_return_type->buffer, cur_function->function_name->buffer, function_args_list->buffer);
 	function_definition++;
 	BEGIN(INITIAL);
 }
@@ -229,7 +229,6 @@ char *curfilename;	/*this saved included file's name*/
 
 <LOOKING_TYPEDEF_END>{WS}	{ /*skip white space*/ }
 <LOOKING_TYPEDEF_END>";"	{
-	//printf("%s:%3d find whole typedef definition which is 'typedef %s %s'\n", curbs->filename, yylineno, type->buffer, def->buffer);
 	insert_into_hash_table(type_table, def->buffer);
 	typedefed++;
 	BEGIN(INITIAL);
@@ -267,21 +266,43 @@ char *curfilename;	/*this saved included file's name*/
 <LOOKING_ARGS_LIST>"("	{
 	/*those code is to avoid nested parentheses*/
 	int nested = 1;
+	int instring = 0;
 	char temp = 0;
 	string_replace(function_pars_list, "(");
-	for (; (temp = input()) && temp != EOF ; string_add(function_pars_list, temp)){
+	for (; (temp = input()) && temp != EOF ; ){
 		if (temp == '('){
 			nested++;
+			string_add(function_pars_list, temp);
 		} else if ( temp == ')'){
 			nested--;
+			string_add(function_pars_list, temp);
+		} else if ( temp == '\''){
+			string_add(function_pars_list, temp);
+			temp = input();
+			if (temp != '\\'){
+				string_add(function_pars_list, temp);
+				string_add(function_pars_list, input());	/*add '*/
+			} else {
+				string_add(function_pars_list, temp);	/*temp =='\\'*/
+				string_add(function_pars_list, input());
+				string_add(function_pars_list, input());	/*add '*/
+			}
+		} else if ( temp == '"'){
+			string_add(function_pars_list, temp);
+			while((temp = input()) && (temp != '"')){
+				string_add(function_pars_list, temp);
+				if (temp == '\\')
+					string_add(function_pars_list, input());
+			}
+		} else{
+			string_add(function_pars_list, temp);
 		}
 		if (nested == 0){
-			string_add(function_pars_list, temp);
 			break;
 		}
 	}
 	if (temp == EOF){
-		fprintf(stderr, "%s:%d fatal error in source code, reading function_pars_list '%s'\n", curfilename, yylineno, function_pars_list->buffer);
+		fprintf(stderr, "fatal error in source code, reading function_pars_list '%s' in %s:%d\n", function_pars_list->buffer, curfilename, yylineno);
 		//exit(1);
 	}
 	BEGIN(LOOKING_INVOCATION_END);
@@ -300,10 +321,8 @@ char *curfilename;	/*this saved included file's name*/
 		 * this means invoke function out of function definition,
 		 * maybe this because our regex is not mature,solve this later.
 		 * */
-		//printf("%s:%3d out of function definition invoke '%s %s'\n", curbs->filename, yylineno,  invocation_function_name->buffer, function_pars_list->buffer);
 	} else{
 		add_invocation(cur_function, invocation_entry_init(yylineno, invocation_function_name->buffer, function_pars_list->buffer));
-		//printf("%s:%3d in function '%s' which invoke '%s %s'\n", curbs->filename, yylineno, cur_function->function_name->buffer,  invocation_function_name->buffer, function_pars_list->buffer);
 	}
 }
 <LOOKING_INVOCATION_END>.	{
@@ -413,6 +432,5 @@ struct file *scan_c(char *filename){
 	type_table = init_file->type_table;
 	read_new_file(filename);
 	yylex();
-	//printf("comment %d\tfunction_definition %d\tfunction_invocation %d\ttypedefed %d\n", comment, function_definition, function_invocation, typedefed);
 	return init_file;
 }
