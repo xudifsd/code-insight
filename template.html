@@ -66,8 +66,8 @@
 		code_insight.findDefinition = function(functionName){
 			var rtn = [];
 			for (var i = 0; i < code_insight.allDefinition.length; i++){
-				if (functionName === code_insight.allDefinition[i]['function_name'])
-					rtn.push(code_insight.allFile[i]);
+				if (functionName === code_insight.allDefinition[i]['function_name'] )
+					rtn.push(code_insight.allDefinition[i]);
 			}
 			return rtn;
 		};
