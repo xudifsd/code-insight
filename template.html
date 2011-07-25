@@ -35,6 +35,10 @@
 	span#invocation:hover {
 		background : #ddf384;
 	}
+	div#file {
+		display : inline;
+		padding-right : 10px;
+	}
 	</style>
 	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
 	<script type="text/javascript">
@@ -173,8 +177,11 @@
 		};
 		$(document).ready(function(){
 			for(var i = 0; i < code_insight.database.length; i++){	/*display all file at the beginning*/
-				$('div#content').append(code_insight.createFileBlock(code_insight.database[i]));
+				$('div#allFile').append(code_insight.createFileBlock(code_insight.database[i]));
 			}
+			$('a#allFile').click(function(){
+				$('div#allFile').slideToggle('fast');
+			});
 			code_insight.eventBind();
 			$('div#loading').hide();
 		});
@@ -188,6 +195,9 @@
 	<span id="file_name">file name</span>
 	<span id="definition">function definition</span>
 	<span id="invocation">function invocation</span>
+</div>
+<a href="#" id="allFile">All file in project</a>
+<div id="allFile">
 </div>
 <hr/>
 <div id="content"></div>
