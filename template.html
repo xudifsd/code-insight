@@ -43,7 +43,7 @@
 	<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.6.2/jquery.min.js"></script>
 	<script type="text/javascript">
 		var code_insight = {};
-		code_insight.database = %s;/*this is for fprintf in c*/
+		code_insight.allFile = %s;/*this is for fprintf in c*/
 		code_insight.createFileBlock = function(object){
 			var rtn = $('<div id="file"></div>').append($('<span id="file_name"/>').attr("file_name", object["file_name"]).text(object["file_name"]));
 			return rtn;
@@ -65,46 +65,34 @@
 		}
 		code_insight.findDefinition = function(functionName){
 			var rtn = [];
-			for (var i = 0; i < code_insight.database.length; i++){
-				for(var j = 0; j < code_insight.database[i]['definition_list'].length; j++){
-					if (functionName === code_insight.database[i]['definition_list'][j]['function_name'])
-						rtn.push(code_insight.database[i]['definition_list'][j]);
-				}
+			for (var i = 0; i < code_insight.allDefinition.length; i++){
+				if (functionName === code_insight.allDefinition[i]['function_name'])
+					rtn.push(code_insight.allFile[i]);
 			}
 			return rtn;
 		};
 		code_insight.findInvocation = function(functionName){
 			var rtn = [];
-			for (var i = 0; i < code_insight.database.length; i++){
-				for (var j = 0; j < code_insight.database[i]['definition_list'].length; j++){
-					for (var k = 0; k <code_insight.database[i]['definition_list'][j]['invocation_list'].length; k++){
-						if (functionName === code_insight.database[i]['definition_list'][j]['invocation_list'][k]['function_name'])
-							rtn.push(code_insight.database[i]['definition_list'][j]['invocation_list'][k]);
-					}
-				}
+			for (var i = 0; i < code_insight.allInvocation.length; i++){
+				if (functionName === code_insight.allInvocation[i]['function_name'])
+					rtn.push(code_insight.allFile[i]);
 			}
 			return rtn;
 		}
 		code_insight.findDefinitionByFileName = function(fileName){
 			var rtn = [];
-			for(var i = 0; i < code_insight.database.length; i++){
-				for (var j = 0; j < code_insight.database[i]["definition_list"].length; j++){
-					if (code_insight.database[i]["definition_list"][j]["file_name"] === fileName){/*some function is defined in included file exclude them*/
-						rtn.push(code_insight.database[i]["definition_list"][j]);
-					}
+			for(var i = 0; i < code_insight.allDefinition.length; i++){
+				if (code_insight.allDefinition[i]["file_name"] === fileName){
+					rtn.push(code_insight.allDefinition[i]);
 				}
 			}
 			return rtn;
 		}
 		code_insight.findInvocationByDefinitionName = function(definitionName){
 			var rtn = [];	/*there maybe same name definition*/
-			for (var i = 0; i < code_insight.database.length; i++){
-				for (var j = 0; j < code_insight.database[i]["definition_list"].length; j++){
-					if (code_insight.database[i]["definition_list"][j]["function_name"] === definitionName){
-						for (var k = 0; k < code_insight.database[i]["definition_list"][j]["invocation_list"].length; k++){
-							rtn.push(code_insight.database[i]["definition_list"][j]["invocation_list"][k]);
-						}
-					}
+			for (var i = 0; i < code_insight.allInvocation.length; i++){
+				if (code_insight.allInvocation[i]["definition_name"] === definitionName){
+					rtn.push(code_insight.allInvocation[i]);
 				}
 			}
 			return rtn;
@@ -176,8 +164,22 @@
 		
 		};
 		$(document).ready(function(){
-			for(var i = 0; i < code_insight.database.length; i++){	/*display all file at the beginning*/
-				$('div#allFile').append(code_insight.createFileBlock(code_insight.database[i]));
+			for(var i = 0; i < code_insight.allFile.length; i++){	/*display all file at the beginning*/
+				$('div#allFile').append(code_insight.createFileBlock(code_insight.allFile[i]));
+			}
+			code_insight.allDefinition = [];
+			code_insight.allInvocation = [];
+			for (var i = 0; i < code_insight.allFile.length; i++){
+				for(var j = 0; j < code_insight.allFile[i]['definition_list'].length; j++){
+					code_insight.allDefinition.push(code_insight.allFile[i]['definition_list'][j]);
+				}
+			}
+			for (var i = 0; i < code_insight.allFile.length; i++){
+				for (var j = 0; j < code_insight.allFile[i]['definition_list'].length; j++){
+					for (var k = 0; k <code_insight.allFile[i]['definition_list'][j]['invocation_list'].length; k++){
+						code_insight.allInvocation.push(code_insight.allFile[i]['definition_list'][j]['invocation_list'][k]);
+					}
+				}
 			}
 			$('a#allFile').click(function(){
 				$('div#allFile').slideToggle('fast');
