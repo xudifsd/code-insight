@@ -39,7 +39,7 @@ string.o : $(LIBS) string.c
 
 install :
 	cp $(PROS) $(PREFIX)
-	mkdir /etc/code-insight
+	-mkdir /etc/code-insight
 	cp template.html /etc/code-insight
 
 uninstall :
