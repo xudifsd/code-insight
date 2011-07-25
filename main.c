@@ -10,7 +10,7 @@ int main(int argc, char *argv[]){
 	for (i = 1; i < argc; i++){
 		head = add_file(head, scan_c(argv[i]));	/*only handle C language right now*/
 	}
-	FILE * template = fopen("template.html", "r");
+	FILE * template = fopen("/etc/code-insight/template.html", "r");
 	if (template == NULL){
 		perror("reading template:");
 		exit(1);

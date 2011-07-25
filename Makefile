@@ -3,6 +3,8 @@ OBJS = cJSON.o c-scanner.o entry.o generator.o interpreter.o hash.o main.o strin
 LIBS = cJSON.h hash.h entry.h generator.h interpreter.h string.h
 PROS = code-insight
 
+PREFIX = ~/bin
+
 CFLAGES = -g
 
 $(PROS) : $(LIBS) $(OBJS)
@@ -34,6 +36,15 @@ main.o : $(LIBS) main.c
 
 string.o : $(LIBS) string.c
 	gcc $(CFLAGES) -c string.c
+
+install :
+	cp $(PROS) $(PREFIX)
+	mkdir /etc/code-insight
+	cp template.html /etc/code-insight
+
+uninstall :
+	rm $(PREFIX)/$(PROS)
+	rm -rf /etc/code-insight
 
 clean:
 	-rm $(PROS) $(OBJS) c-scanner.c
