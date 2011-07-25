@@ -88,6 +88,15 @@
 			}
 			return rtn;
 		}
+		code_insight.findInvocationByFileName = function(fileName){
+			var rtn = [];
+			for(var i = 0; i < code_insight.allInvocation.length; i++){
+				if (code_insight.allInvocation[i]["file_name"] === fileName){
+					rtn.push(code_insight.allInvocation[i]);
+				}
+			}
+			return rtn;
+		}
 		code_insight.findInvocationByDefinitionName = function(definitionName){
 			var rtn = [];	/*there maybe same name definition*/
 			for (var i = 0; i < code_insight.allInvocation.length; i++){
@@ -126,8 +135,18 @@
 				if (objects.length === 0){
 					$('div#content').append($('<div/>').html('<span id="sorry">No function defined in file "'+ $(this).attr('file_name') +'" found</span>'));
 				} else {
+					$('div#content').append($('<span>All definition in "'+$(this).attr('file_name')+'"</span>'));
 					for (var i = 0; i < objects.length; i++){
 						$('div#content').append(code_insight.createDefinitionBlock(objects[i]));
+					}
+				}
+				var objects = code_insight.findInvocationByFileName($(this).attr('file_name'));
+				if (objects.length === 0){
+					$('div#content').append($('<div/>').html('<span id="sorry">No function invoked in file "'+ $(this).attr('file_name') +'" found</span>'));
+				} else {
+					$('div#content').append($('<span>All invocation in "'+$(this).attr('file_name')+'"</span>'));
+					for (var i = 0; i < objects.length; i++){
+						$('div#content').append(code_insight.createInvocationBlock(objects[i]));
 					}
 				}
 				code_insight.eventBind();
