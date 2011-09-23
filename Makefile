@@ -1,6 +1,6 @@
 
-OBJS = cJSON.o c-scanner.o entry.o generator.o interpreter.o hash.o main.o string.o
-LIBS = cJSON.h hash.h entry.h generator.h interpreter.h string.h
+OBJS = cJSON.o c-scanner.o entry.o generator.o interpreter.o hash.o main.o string.o to-dot.o
+LIBS = cJSON.h hash.h entry.h generator.h interpreter.h string.h to-dot.h
 PROS = code-insight
 
 PREFIX = ~/bin
@@ -18,6 +18,9 @@ c-scanner.o : $(LIBS) c-scanner.c
 
 c-scanner.c: $(LIBS) c-scanner.l
 	flex -o c-scanner.c c-scanner.l
+
+to-dot.o: $(LIBS)
+	gcc $(CFLAGES) -c to-dot.c
 
 entry.o : $(LIBS) entry.c
 	gcc $(CFLAGES) -c entry.c

@@ -3,6 +3,7 @@
 #include "entry.h"
 #include "interpreter.h"
 #include "generator.h"
+#include "to-dot.h"
 
 int main(int argc, char *argv[]){
 	int i;
@@ -21,4 +22,8 @@ int main(int argc, char *argv[]){
 		exit(1);
 	}
 	fprintf(out, read_template(template), interpret(head));
+
+	/*generate dot file*/
+	FILE *stream = fopen("temp.gv", "w");
+	to_dot(stream, head);
 }
